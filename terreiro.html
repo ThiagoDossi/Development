@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Casa de Caridade e Esperança — Painel de Organização</title>
+<style>
+  :root{
+    --mata:#1b4332;
+    --mata-light:#2d6a4f;
+    --mar:#0d1b2a;
+    --mar-light:#1b3a4b;
+    --dourado:#d4af37;
+    --areia:#f4ecd8;
+    --branco:#fffaf0;
+    --texto:#22333b;
+    --alerta:#e85d04;
+  }
+  *{box-sizing:border-box;}
+  body{
+    font-family: Georgia, 'Segoe UI', serif;
+    background: linear-gradient(180deg,var(--areia) 0%, #e8ddc0 100%);
+    color:var(--texto);
+    margin:0;
+    min-height:100vh;
+  }
+  .hidden{display:none !important;}
+  button{
+    cursor:pointer;
+    font-family:inherit;
+    border:none;
+    border-radius:6px;
+    padding:.5rem .9rem;
+    font-size:.9rem;
+  }
+  .btn-primary{ background:var(--mata); color:var(--branco); }
+  .btn-primary:hover{ background:var(--mata-light); }
+  .btn-secondary{ background:#ddd3b8; color:var(--texto); }
+  .btn-logout{ background:var(--dourado); color:var(--mar); font-weight:bold; }
+
+  /* ---------- LOGIN ---------- */
+  .login-screen{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: radial-gradient(circle at top, var(--mar-light), var(--mar) 70%);
+  }
+  .login-box{
+    background:var(--branco);
+    border:3px solid var(--dourado);
+    border-radius:14px;
+    padding:2rem 2.5rem;
+    max-width:380px;
+    width:90%;
+    box-shadow:0 10px 30px rgba(0,0,0,.4);
+    text-align:center;
+  }
+  .login-emblem{ font-size:1.6rem; margin-bottom:.5rem; letter-spacing:.3rem; }
+  .login-box h1{ font-size:1.25rem; color:var(--mata); margin-bottom:.2rem; }
+  .login-box .login-subtitle{ font-size:.85rem; color:#777; font-style:italic; margin-bottom:1.2rem; }
+  .login-box form{ display:flex; flex-direction:column; gap:.9rem; text-align:left; }
+  .login-box label{ font-size:.85rem; font-weight:bold; display:flex; flex-direction:column; gap:.3rem; }
+  .checkbox-label{ flex-direction:row !important; align-items:center; gap:.5rem !important; }
+  input, textarea{
+    font-family:inherit;
+    padding:.5rem;
+    border:1px solid #ccc;
+    border-radius:6px;
+    font-size:.9rem;
+  }
+  .error{ color:#a4161a; font-size:.8rem; }
+
+  /* ---------- APP LAYOUT ---------- */
+  .topbar{
+    background: linear-gradient(120deg,var(--mata) 0%, var(--mar) 100%);
+    color:var(--branco);
+    padding:.9rem 1.4rem;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    border-bottom:4px solid var(--dourado);
+    flex-wrap:wrap;
+    gap:.5rem;
+  }
+  .brand{ font-weight:bold; letter-spacing:.03rem; }
+  .brand small{ display:block; font-weight:normal; font-size:.75rem; opacity:.85; letter-spacing:0; }
+  .session-info{ display:flex; align-items:center; gap:.7rem; font-size:.85rem; }
+  .app-body{ display:flex; min-height:calc(100vh - 60px); }
+  .sidebar{
+    width:250px;
+    background:var(--mata);
+    color:var(--areia);
+    padding:1rem 0;
+    flex-shrink:0;
+  }
+  .content{ flex:1; padding:1.5rem 2rem; }
+  ul.nav-root, ul.nav-children{ list-style:none; margin:0; padding:0; }
+  ul.nav-children{ padding-left:1rem; }
+  .nav-parent, .nav-link{
+    display:flex; align-items:center; gap:.4rem;
+    width:100%; text-align:left;
+    background:none; color:var(--areia);
+    padding:.55rem 1rem; font-size:.88rem; border-radius:0;
+  }
+  .nav-parent{ cursor:pointer; justify-content:space-between; }
+  .nav-parent:hover, .nav-link:hover{ background:rgba(255,255,255,.08); }
+  .nav-link.active{ background:var(--dourado); color:var(--mar); font-weight:bold; }
+  .chevron{ transition:transform .15s; }
+  .chevron.open{ transform:rotate(90deg); }
+
+  .view-header h2{ color:var(--mata); border-bottom:2px solid var(--dourado); padding-bottom:.4rem; }
+  .hint{ color:#777; font-style:italic; }
+
+  /* ---------- CALENDAR ---------- */
+  .cal-controls{ display:flex; align-items:center; gap:1rem; margin:1rem 0; }
+  .cal-legend{ display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:.6rem; font-size:.8rem; }
+  .cal-legend span{ display:inline-flex; align-items:center; gap:.35rem; }
+  .legend-swatch{ width:12px; height:12px; border-radius:3px; display:inline-block; }
+  .legend-dot{ width:12px; height:12px; border-radius:50%; display:inline-block; background:var(--alerta); box-shadow:0 0 0 3px rgba(232,93,4,.25); }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:.3rem; }
+  .cal-weekdays div{ text-align:center; font-weight:bold; color:var(--mar); font-size:.8rem; }
+  .cal-cell{
+    background:var(--branco); border:1px solid #ddd; border-radius:6px;
+    min-height:82px; padding:.3rem; cursor:pointer; position:relative;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .cal-cell.empty{ background:transparent; border:none; cursor:default; }
+  .cal-cell:hover{ border-color:var(--dourado); }
+  .cal-cell.selected{ border:2px solid var(--mata); }
+  .cal-cell.today .cal-day-num{ color:var(--dourado); font-weight:bold; }
+  .cal-day-num{ font-size:.8rem; }
+  .cal-item-list{ display:flex; flex-direction:column; gap:2px; margin-top:3px; }
+  .cal-chip{
+    font-size:.65rem; line-height:1.2; padding:2px 5px; border-radius:4px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:bold;
+  }
+  .cal-chip.chip-event{ background:var(--mata); color:var(--branco); }
+  .cal-chip-more{ font-size:.62rem; color:#555; font-style:italic; margin-top:1px; }
+  .cal-task-dots{ display:flex; gap:4px; flex-wrap:wrap; margin-top:auto; padding-top:4px; }
+  .cal-task-dot{
+    width:11px; height:11px; border-radius:50%; background:var(--alerta);
+    box-shadow:0 0 0 3px rgba(232,93,4,.22); cursor:help; flex-shrink:0;
+  }
+  .cal-events-panel{ margin-top:1.2rem; }
+
+  /* ---------- CARDS / TABLE ---------- */
+  .card-list{ display:flex; flex-direction:column; gap:.8rem; margin:1rem 0; }
+  .card{ background:var(--branco); border:1px solid #ddd; border-left:4px solid var(--mata); border-radius:8px; padding:.9rem 1.1rem; }
+  .card-header{ display:flex; justify-content:space-between; align-items:center; }
+  .card-actions button{ background:none; padding:.2rem .4rem; }
+  .volunteers{ font-size:.9rem; }
+  .badge-help{ display:inline-block; background:#fff3cd; color:#8a5a00; border:1px solid #d4af37; border-radius:20px; padding:.2rem .7rem; font-size:.8rem; margin-top:.3rem; }
+  .badge-date{ display:inline-block; background:#e7f3ec; color:var(--mata); border:1px solid var(--mata); border-radius:20px; padding:.2rem .7rem; font-size:.8rem; margin-top:.3rem; }
+  .task-actions{ margin-top:.6rem; display:flex; gap:.5rem; flex-wrap:wrap; }
+  .task-actions button{ background:var(--mar-light); color:var(--branco); font-size:.8rem; }
+
+  table.data-table{ width:100%; border-collapse:collapse; margin-top:1rem; background:var(--branco); }
+  table.data-table th, table.data-table td{ border:1px solid #ddd; padding:.55rem .7rem; text-align:left; font-size:.9rem; }
+  table.data-table th{ background:var(--mata); color:var(--branco); }
+  .table-actions button{ background:none; padding:.1rem .3rem; }
+
+  /* ---------- MODAL ---------- */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(13,27,42,.6);
+    display:flex; align-items:center; justify-content:center; z-index:50;
+  }
+  .modal-box{ background:var(--branco); border:2px solid var(--dourado); border-radius:10px; padding:1.5rem; width:90%; max-width:420px; }
+  .modal-body{ display:flex; flex-direction:column; gap:.8rem; margin:1rem 0; }
+  .modal-body label{ display:flex; flex-direction:column; gap:.3rem; font-size:.85rem; font-weight:bold; text-align:left; }
+  .modal-actions{ display:flex; justify-content:flex-end; gap:.6rem; }
+
+  @media (max-width:750px){
+    .app-body{ flex-direction:column; }
+    .sidebar{ width:100%; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-box">
+    <div class="login-emblem">🕯️ 🌊 🍃</div>
+    <h1>Casa de Caridade e Esperança</h1>
+    <p class="login-subtitle">Painel de Organização</p>
+    <form id="loginForm">
+      <label>Seu nome
+        <input type="text" id="loginName" required placeholder="Como você é chamado(a) no terreiro">
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" id="isAdminCheck"> Sou administrador(a)
+      </label>
+      <div id="adminFields" class="hidden">
+        <label>Usuário administrador
+          <input type="text" id="adminUser">
+        </label>
+        <label>Senha
+          <input type="password" id="adminPass">
+        </label>
+      </div>
+      <button type="submit" class="btn-primary">Entrar</button>
+      <p id="loginError" class="error hidden"></p>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="app" class="hidden">
+  <header class="topbar">
+    <div class="brand">🕯️ Casa de Caridade e Esperança<small>Painel de Organização</small></div>
+    <div class="session-info">
+      <span id="sessionName"></span> · <span id="sessionRole"></span>
+      <button class="btn-logout" onclick="logout()">Sair</button>
+    </div>
+  </header>
+  <div class="app-body">
+    <nav class="sidebar" id="sidebar"></nav>
+    <main class="content" id="content"></main>
+  </div>
+</div>
+
+<!-- ===================== MODAL GENÉRICO ===================== -->
+<div id="modalOverlay" class="modal-overlay hidden">
+  <div class="modal-box">
+    <h3 id="modalTitle"></h3>
+    <div id="modalBody" class="modal-body"></div>
+    <div class="modal-actions">
+      <button id="modalCancelBtn" class="btn-secondary">Cancelar</button>
+      <button id="modalSaveBtn" class="btn-primary">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================
+   CONFIGURAÇÃO — edite aqui os 2 administradores
+   ===================================================== */
+const CONFIG = {
+  admins: [
+    { user: 'Thiago Dossi', pass: 'Terreiro' },
+    { user: 'admin2', pass: 'troque-esta-senha-2' }
+  ]
+};
+
+const STOCK_CATEGORIES = [
+  { id:'defumacao',   name:'Defumação',                  icon:'🌿' },
+  { id:'velas',       name:'Velas',                       icon:'🕯️' },
+  { id:'cura',        name:'Trabalho de Cura',            icon:'💧' },
+  { id:'caboclo',     name:'Trabalho de Caboclo',         icon:'🏹' },
+  { id:'pretosvelhos',name:'Trabalho de Pretos Velhos',   icon:'🙏' },
+  { id:'esquerda',    name:'Trabalho de Esquerda',        icon:'🔥' },
+  { id:'fora',        name:'Trabalhos fora do terreiro',  icon:'🚗' },
+  { id:'ere',         name:'Trabalho de Ere',             icon:'🎈' }
+];
+
+const ACTIVITY_CATEGORIES = [
+  { id:'limpeza', name:'Limpeza do Terreiro', icon:'🧹' },
+  { id:'bazar',   name:'Bazar',               icon:'🛍️' },
+  { id:'arrecadacao', name:'Arrecadação', icon:'🎁', sub:[
+      { id:'roupas',     name:'Roupas',     icon:'👕' },
+      { id:'brinquedos', name:'Brinquedos', icon:'🧸' },
+      { id:'outros',     name:'Outros',     icon:'📦' }
+  ]}
+];
+
+/* =====================================================
+   ESTADO / PERSISTÊNCIA
+   ===================================================== */
+function initData(){
+  let data = JSON.parse(localStorage.getItem('terreiroData') || 'null') || { events:[], stock:{}, activities:{} };
+  STOCK_CATEGORIES.forEach(c=>{ if(!data.stock[c.id]) data.stock[c.id] = []; });
+  ACTIVITY_CATEGORIES.forEach(c=>{
+    if(c.sub){ c.sub.forEach(s=>{ if(!data.activities[s.id]) data.activities[s.id] = []; }); }
+    else if(!data.activities[c.id]) data.activities[c.id] = [];
+  });
+  return data;
+}
+let DATA = initData();
+function save(){ localStorage.setItem('terreiroData', JSON.stringify(DATA)); }
+
+let session = JSON.parse(localStorage.getItem('terreiroSession') || 'null');
+function isAdmin(){ return !!session && session.role === 'admin'; }
+function logout(){ localStorage.removeItem('terreiroSession'); location.reload(); }
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function escapeHtml(str){
+  if(str === null || str === undefined) return '';
+  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function todayStr(){
+  const t = new Date();
+  return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+}
+function formatDateBR(dateStr){
+  const [y,m,d] = dateStr.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+const content = document.getElementById('content');
+
+/* =====================================================
+   MODAL GENÉRICO
+   ===================================================== */
+const modalOverlay = document.getElementById('modalOverlay');
+const modalTitle = document.getElementById('modalTitle');
+const modalBody = document.getElementById('modalBody');
+const modalSaveBtn = document.getElementById('modalSaveBtn');
+const modalCancelBtn = document.getElementById('modalCancelBtn');
+
+function openModal(title, fields, onSave){
+  modalTitle.textContent = title;
+  modalBody.innerHTML = fields.map(f => `
+    <label>${escapeHtml(f.label)}
+      ${f.type === 'textarea'
+        ? `<textarea data-key="${f.key}">${escapeHtml(f.value)}</textarea>`
+        : `<input type="${f.type || 'text'}" data-key="${f.key}" value="${escapeHtml(f.value)}">`}
+    </label>
+  `).join('');
+  modalOverlay.classList.remove('hidden');
+  modalSaveBtn.onclick = () => {
+    const values = {};
+    modalBody.querySelectorAll('[data-key]').forEach(el => values[el.dataset.key] = el.value);
+    onSave(values);
+    closeModal();
+  };
+}
+function closeModal(){ modalOverlay.classList.add('hidden'); }
+modalCancelBtn.onclick = closeModal;
+
+/* =====================================================
+   NAVEGAÇÃO LATERAL
+   ===================================================== */
+function buildNav(){
+  const structure = [
+    { id:'calendario', label:'Calendário', icon:'📅', type:'calendar' },
+    { id:'estoque-group', label:'Estoque', icon:'📦', children: STOCK_CATEGORIES.map(c=>({id:c.id,label:c.name,icon:c.icon,type:'stock'})) },
+    { id:'atividades-group', label:'Atividades', icon:'🤝', children: ACTIVITY_CATEGORIES.map(c =>
+        c.sub
+          ? { id:c.id+'-group', label:c.name, icon:c.icon, children: c.sub.map(s=>({id:s.id,label:s.name,icon:s.icon,type:'activity'})) }
+          : { id:c.id, label:c.name, icon:c.icon, type:'activity' }
+      )
+    }
+  ];
+  document.getElementById('sidebar').innerHTML = `<ul class="nav-root">${renderNavItems(structure)}</ul>`;
+}
+function renderNavItems(items){
+  return items.map(item => {
+    if(item.children){
+      return `<li class="nav-group">
+        <div class="nav-parent" onclick="toggleGroup('${item.id}')">
+          <span>${item.icon} ${escapeHtml(item.label)}</span>
+          <span class="chevron" id="chev-${item.id}">▸</span>
+        </div>
+        <ul class="nav-children hidden" id="group-${item.id}">${renderNavItems(item.children)}</ul>
+      </li>`;
+    }
+    return `<li><button class="nav-link" data-id="${item.id}" onclick="navigateTo('${item.type}','${item.id}')">${item.icon} ${escapeHtml(item.label)}</button></li>`;
+  }).join('');
+}
+function toggleGroup(id){
+  document.getElementById('group-'+id).classList.toggle('hidden');
+  const chev = document.getElementById('chev-'+id);
+  if(chev) chev.classList.toggle('open');
+}
+function setActiveNav(id){
+  document.querySelectorAll('.nav-link').forEach(b => b.classList.toggle('active', b.dataset.id === id));
+}
+function navigateTo(type, id){
+  if(type === 'calendar') renderCalendar();
+  else if(type === 'stock') renderStock(id);
+  else if(type === 'activity') renderActivities(id);
+}
+
+/* =====================================================
+   CALENDÁRIO
+   ===================================================== */
+const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+let calState = { month: new Date().getMonth(), year: new Date().getFullYear(), selectedDate: todayStr() };
+
+function getScheduledTasksForDate(dateStr){
+  const results = [];
+  Object.keys(DATA.activities).forEach(catId => {
+    DATA.activities[catId].forEach(t => {
+      if(t.date === dateStr) results.push(Object.assign({ catId }, t));
+    });
+  });
+  return results;
+}
+
+function renderCalendar(){
+  setActiveNav('calendario');
+  const first = new Date(calState.year, calState.month, 1);
+  const startWeekday = first.getDay();
+  const daysInMonth = new Date(calState.year, calState.month+1, 0).getDate();
+  const MAX_CHIPS = 3;
+  let cells = '';
+  for(let i=0;i<startWeekday;i++) cells += `<div class="cal-cell empty"></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = `${calState.year}-${String(calState.month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dayEvents = DATA.events.filter(e => e.date === dateStr);
+    const dayTasks = getScheduledTasksForDate(dateStr);
+
+    const visibleEvents = dayEvents.slice(0, MAX_CHIPS);
+    const extraEvents = dayEvents.length - visibleEvents.length;
+    const chipsHtml = visibleEvents.map(e => `<span class="cal-chip chip-event" title="${escapeHtml(e.title)}">${escapeHtml(e.title)}</span>`).join('');
+
+    const dotsHtml = dayTasks.map(t => `<span class="cal-task-dot" title="${escapeHtml(t.title)}"></span>`).join('');
+
+    cells += `<div class="cal-cell ${calState.selectedDate===dateStr?'selected':''} ${dateStr===todayStr()?'today':''}" onclick="selectDay('${dateStr}')">
+      <span class="cal-day-num">${d}</span>
+      <div class="cal-item-list">
+        ${chipsHtml}
+        ${extraEvents > 0 ? `<span class="cal-chip-more">+${extraEvents} mais</span>` : ''}
+      </div>
+      ${dotsHtml ? `<div class="cal-task-dots">${dotsHtml}</div>` : ''}
+    </div>`;
+  }
+  content.innerHTML = `
+    <div class="view-header"><h2>📅 Calendário</h2></div>
+    <div class="cal-controls">
+      <button onclick="changeMonth(-1)">‹ Anterior</button>
+      <strong>${MONTH_NAMES[calState.month]} de ${calState.year}</strong>
+      <button onclick="changeMonth(1)">Próximo ›</button>
+    </div>
+    <div class="cal-legend">
+      <span><span class="legend-swatch" style="background:var(--mata)"></span> Evento do calendário (texto no dia)</span>
+      <span><span class="legend-dot"></span> Atividade/trabalho agendado (veja abaixo)</span>
+    </div>
+    <div class="cal-grid cal-weekdays">
+      <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+    </div>
+    <div class="cal-grid">${cells}</div>
+    <div class="cal-events-panel">${renderDayEvents()}</div>
+  `;
+}
+function renderDayEvents(){
+  const evs = DATA.events.filter(e => e.date === calState.selectedDate);
+  const tasks = getScheduledTasksForDate(calState.selectedDate);
+  return `
+    <h3>Eventos em ${formatDateBR(calState.selectedDate)}</h3>
+    <div class="card-list">
+      ${evs.map(e => `
+        <div class="card">
+          <div class="card-header"><strong>${escapeHtml(e.title)}</strong>
+            <span class="card-actions">
+              <button onclick="editEvent('${e.id}')">✏️</button>
+              ${isAdmin() ? `<button onclick="deleteEvent('${e.id}')">🗑️</button>` : ''}
+            </span>
+          </div>
+          <p>${escapeHtml(e.desc)}</p>
+          <small>Criado por ${escapeHtml(e.author)}</small>
+        </div>`).join('') || '<p class="hint">Nenhum evento neste dia.</p>'}
+    </div>
+    ${tasks.length ? `
+      <h3>Atividades agendadas</h3>
+      <div class="card-list">
+        ${tasks.map(t => {
+          const cat = findActivityCat(t.catId);
+          return `
+          <div class="card">
+            <div class="card-header"><strong>${cat.icon} ${escapeHtml(t.title)}</strong></div>
+            <p class="hint">${escapeHtml(cat.name)}</p>
+            <p>${escapeHtml(t.desc)}</p>
+            <p class="volunteers"><strong>Voluntários:</strong> ${t.volunteers.length ? t.volunteers.map(escapeHtml).join(', ') : 'Nenhum ainda'}</p>
+            ${t.needsHelp ? '<span class="badge-help">🙋 Precisa de mais gente!</span>' : ''}
+            <div class="task-actions">
+              <button onclick="navigateTo('activity','${t.catId}')">Ver atividade</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    ` : ''}
+    <button class="btn-primary" onclick="addEvent()">+ Novo evento neste dia</button>
+  `;
+}
+function selectDay(dateStr){ calState.selectedDate = dateStr; renderCalendar(); }
+function changeMonth(delta){
+  calState.month += delta;
+  if(calState.month < 0){ calState.month = 11; calState.year--; }
+  if(calState.month > 11){ calState.month = 0; calState.year++; }
+  renderCalendar();
+}
+function addEvent(){
+  openModal('Novo evento', [
+    { key:'title', label:'Título', value:'' },
+    { key:'desc', label:'Descrição', type:'textarea', value:'' }
+  ], vals => {
+    if(!vals.title.trim()) return;
+    DATA.events.push({ id:uid(), date:calState.selectedDate, title:vals.title.trim(), desc:vals.desc.trim(), author:session.name });
+    save(); renderCalendar();
+  });
+}
+function editEvent(id){
+  const ev = DATA.events.find(e => e.id === id);
+  openModal('Editar evento', [
+    { key:'title', label:'Título', value:ev.title },
+    { key:'desc', label:'Descrição', type:'textarea', value:ev.desc }
+  ], vals => {
+    ev.title = vals.title.trim(); ev.desc = vals.desc.trim();
+    save(); renderCalendar();
+  });
+}
+function deleteEvent(id){
+  if(!isAdmin()) return;
+  if(!confirm('Excluir este evento?')) return;
+  DATA.events = DATA.events.filter(e => e.id !== id);
+  save(); renderCalendar();
+}
+
+/* =====================================================
+   ESTOQUE
+   ===================================================== */
+function renderStock(catId){
+  setActiveNav(catId);
+  const cat = STOCK_CATEGORIES.find(c => c.id === catId);
+  const items = DATA.stock[catId];
+  content.innerHTML = `
+    <div class="view-header"><h2>${cat.icon} Estoque — ${escapeHtml(cat.name)}</h2></div>
+    <table class="data-table">
+      <thead><tr><th>Item</th><th>Qtd.</th><th>Unid.</th><th>Observação</th><th></th></tr></thead>
+      <tbody>
+        ${items.length ? items.map(it => `
+          <tr>
+            <td>${escapeHtml(it.nome)}</td>
+            <td>${escapeHtml(it.quantidade)}</td>
+            <td>${escapeHtml(it.unidade)}</td>
+            <td>${escapeHtml(it.obs)}</td>
+            <td class="table-actions">
+              <button onclick="editStockItem('${catId}','${it.id}')">✏️</button>
+              ${isAdmin() ? `<button onclick="deleteStockItem('${catId}','${it.id}')">🗑️</button>` : ''}
+            </td>
+          </tr>`).join('') : `<tr><td colspan="5" class="hint">Nenhum item cadastrado ainda.</td></tr>`}
+      </tbody>
+    </table>
+    <button class="btn-primary" style="margin-top:1rem" onclick="addStockItem('${catId}')">+ Adicionar item</button>
+  `;
+}
+function stockFieldsModal(existing){
+  return [
+    { key:'nome', label:'Item', value: existing ? existing.nome : '' },
+    { key:'quantidade', label:'Quantidade', type:'number', value: existing ? existing.quantidade : '' },
+    { key:'unidade', label:'Unidade (ex: unid, kg, pacote)', value: existing ? existing.unidade : '' },
+    { key:'obs', label:'Observação', type:'textarea', value: existing ? existing.obs : '' }
+  ];
+}
+function addStockItem(catId){
+  openModal('Novo item de estoque', stockFieldsModal(), vals => {
+    if(!vals.nome.trim()) return;
+    DATA.stock[catId].push({ id:uid(), nome:vals.nome.trim(), quantidade:vals.quantidade, unidade:vals.unidade.trim(), obs:vals.obs.trim() });
+    save(); renderStock(catId);
+  });
+}
+function editStockItem(catId, itemId){
+  const it = DATA.stock[catId].find(i => i.id === itemId);
+  openModal('Editar item', stockFieldsModal(it), vals => {
+    it.nome = vals.nome.trim(); it.quantidade = vals.quantidade; it.unidade = vals.unidade.trim(); it.obs = vals.obs.trim();
+    save(); renderStock(catId);
+  });
+}
+function deleteStockItem(catId, itemId){
+  if(!isAdmin()) return;
+  if(!confirm('Excluir este item?')) return;
+  DATA.stock[catId] = DATA.stock[catId].filter(i => i.id !== itemId);
+  save(); renderStock(catId);
+}
+
+/* =====================================================
+   ATIVIDADES
+   ===================================================== */
+function findActivityCat(id){
+  for(const c of ACTIVITY_CATEGORIES){
+    if(c.id === id) return c;
+    if(c.sub){ const s = c.sub.find(s => s.id === id); if(s) return s; }
+  }
+  return { name:'', icon:'' };
+}
+function renderActivities(catId){
+  setActiveNav(catId);
+  const cat = findActivityCat(catId);
+  const tasks = DATA.activities[catId];
+  content.innerHTML = `
+    <div class="view-header"><h2>${cat.icon} ${escapeHtml(cat.name)}</h2></div>
+    <div class="card-list">
+      ${tasks.length ? tasks.map(t => renderTaskCard(catId, t)).join('') : '<p class="hint">Nenhuma atividade cadastrada ainda.</p>'}
+    </div>
+    <button class="btn-primary" onclick="addTask('${catId}')">+ Nova atividade</button>
+  `;
+}
+function renderTaskCard(catId, t){
+  const isVol = t.volunteers.includes(session.name);
+  return `
+    <div class="card task-card">
+      <div class="card-header">
+        <strong>${escapeHtml(t.title)}</strong>
+        <span class="card-actions">
+          <button onclick="editTask('${catId}','${t.id}')">✏️</button>
+          ${isAdmin() ? `<button onclick="deleteTask('${catId}','${t.id}')">🗑️</button>` : ''}
+        </span>
+      </div>
+      <p>${escapeHtml(t.desc)}</p>
+      ${t.date ? `<span class="badge-date">📅 Agendado para ${formatDateBR(t.date)}</span>` : ''}
+      <p class="volunteers"><strong>Voluntários:</strong> ${t.volunteers.length ? t.volunteers.map(escapeHtml).join(', ') : 'Nenhum ainda'}</p>
+      ${t.needsHelp ? '<span class="badge-help">🙋 Precisa de mais gente!</span>' : ''}
+      <div class="task-actions">
+        ${isVol
+          ? `<button onclick="leaveTask('${catId}','${t.id}')">Desistir</button>`
+          : `<button onclick="joinTask('${catId}','${t.id}')">🙌 Quero ajudar</button>`}
+        ${t.needsHelp
+          ? `<button onclick="clearHelp('${catId}','${t.id}')">✅ Ajuda conseguida</button>`
+          : `<button onclick="requestHelp('${catId}','${t.id}')">📢 Pedir ajuda</button>`}
+      </div>
+    </div>
+  `;
+}
+function taskFieldsModal(existing){
+  return [
+    { key:'title', label:'Título da atividade', value: existing ? existing.title : '' },
+    { key:'desc', label:'Descrição', type:'textarea', value: existing ? existing.desc : '' },
+    { key:'date', label:'Data no calendário (opcional)', type:'date', value: existing ? (existing.date || '') : '' }
+  ];
+}
+function addTask(catId){
+  openModal('Nova atividade', taskFieldsModal(), vals => {
+    if(!vals.title.trim()) return;
+    DATA.activities[catId].push({ id:uid(), title:vals.title.trim(), desc:vals.desc.trim(), date:vals.date || '', volunteers:[], needsHelp:false, author:session.name });
+    save(); renderActivities(catId);
+  });
+}
+function editTask(catId, taskId){
+  const t = DATA.activities[catId].find(x => x.id === taskId);
+  openModal('Editar atividade', taskFieldsModal(t), vals => {
+    t.title = vals.title.trim(); t.desc = vals.desc.trim(); t.date = vals.date || '';
+    save(); renderActivities(catId);
+  });
+}
+function deleteTask(catId, taskId){
+  if(!isAdmin()) return;
+  if(!confirm('Excluir esta atividade?')) return;
+  DATA.activities[catId] = DATA.activities[catId].filter(x => x.id !== taskId);
+  save(); renderActivities(catId);
+}
+function joinTask(catId, taskId){
+  const t = DATA.activities[catId].find(x => x.id === taskId);
+  if(!t.volunteers.includes(session.name)) t.volunteers.push(session.name);
+  save(); renderActivities(catId);
+}
+function leaveTask(catId, taskId){
+  const t = DATA.activities[catId].find(x => x.id === taskId);
+  t.volunteers = t.volunteers.filter(v => v !== session.name);
+  save(); renderActivities(catId);
+}
+function requestHelp(catId, taskId){
+  const t = DATA.activities[catId].find(x => x.id === taskId);
+  t.needsHelp = true; save(); renderActivities(catId);
+}
+function clearHelp(catId, taskId){
+  const t = DATA.activities[catId].find(x => x.id === taskId);
+  t.needsHelp = false; save(); renderActivities(catId);
+}
+
+/* =====================================================
+   LOGIN / INICIALIZAÇÃO
+   ===================================================== */
+document.getElementById('isAdminCheck').addEventListener('change', e => {
+  document.getElementById('adminFields').classList.toggle('hidden', !e.target.checked);
+});
+document.getElementById('loginForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = document.getElementById('loginName').value.trim();
+  const errorEl = document.getElementById('loginError');
+  errorEl.classList.add('hidden');
+  if(!name) return;
+  let role = 'editor';
+  if(document.getElementById('isAdminCheck').checked){
+    const u = document.getElementById('adminUser').value.trim();
+    const p = document.getElementById('adminPass').value;
+    const match = CONFIG.admins.find(a => a.user === u && a.pass === p);
+    if(!match){
+      errorEl.textContent = 'Usuário ou senha de administrador incorretos.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+    role = 'admin';
+  }
+  session = { name, role };
+  localStorage.setItem('terreiroSession', JSON.stringify(session));
+  startApp();
+});
+
+function startApp(){
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('sessionName').textContent = session.name;
+  document.getElementById('sessionRole').textContent = session.role === 'admin' ? 'Administrador(a)' : 'Colaborador(a)';
+  buildNav();
+  renderCalendar();
+}
+
+if(session){ startApp(); }
+</script>
+</body>
+</html>
