@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Casa de Caridade e Esperança — Painel de Organização</title>
+
+<!-- ===================== FIREBASE (SDK "compat") ===================== -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
 <style>
   :root{
     --mata:#1b4332;
@@ -38,7 +44,7 @@
   .btn-secondary{ background:#ddd3b8; color:var(--texto); }
   .btn-logout{ background:var(--dourado); color:var(--mar); font-weight:bold; }
 
-  /* ---------- LOGIN ---------- */
+  /* ---------- LOGIN / CARREGANDO ---------- */
   .login-screen{
     min-height:100vh;
     display:flex;
@@ -59,9 +65,11 @@
   .login-emblem{ font-size:1.6rem; margin-bottom:.5rem; letter-spacing:.3rem; }
   .login-box h1{ font-size:1.25rem; color:var(--mata); margin-bottom:.2rem; }
   .login-box .login-subtitle{ font-size:.85rem; color:#777; font-style:italic; margin-bottom:1.2rem; }
-  .login-box form{ display:flex; flex-direction:column; gap:.9rem; text-align:left; }
+  .auth-tabs{ display:flex; border:1px solid #ddd; border-radius:8px; overflow:hidden; margin-bottom:1.2rem; }
+  .auth-tab{ flex:1; background:#eee3c4; color:var(--texto); border-radius:0; font-weight:bold; padding:.6rem; }
+  .auth-tab.active{ background:var(--mata); color:var(--branco); }
+  .auth-form{ display:flex; flex-direction:column; gap:.9rem; text-align:left; }
   .login-box label{ font-size:.85rem; font-weight:bold; display:flex; flex-direction:column; gap:.3rem; }
-  .checkbox-label{ flex-direction:row !important; align-items:center; gap:.5rem !important; }
   input, textarea{
     font-family:inherit;
     padding:.5rem;
@@ -69,7 +77,7 @@
     border-radius:6px;
     font-size:.9rem;
   }
-  .error{ color:#a4161a; font-size:.8rem; }
+  .error{ color:#a4161a; font-size:.8rem; margin-top:.8rem; }
 
   /* ---------- APP LAYOUT ---------- */
   .topbar{
@@ -160,6 +168,18 @@
   table.data-table th{ background:var(--mata); color:var(--branco); }
   .table-actions button{ background:none; padding:.1rem .3rem; }
 
+  /* ---------- PACIENTES / FICHA DE CURA ---------- */
+  .patient-summary-grid{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:.6rem 1.2rem; margin:.6rem 0;
+  }
+  .patient-field-label{ font-size:.72rem; color:#777; text-transform:uppercase; letter-spacing:.03rem; }
+  .back-link{ background:none; color:var(--mata); font-weight:bold; padding:.3rem 0; margin-bottom:.8rem; text-align:left; display:inline-block; }
+  .back-link:hover{ text-decoration:underline; }
+  .timeline-list{ display:flex; flex-direction:column; gap:.6rem; margin-top:.8rem; }
+  .timeline-entry{ background:#f7f1e3; border-left:3px solid var(--dourado); border-radius:6px; padding:.6rem .8rem; font-size:.88rem; }
+  .timeline-date{ font-weight:bold; color:var(--mata); font-size:.8rem; margin-bottom:.2rem; }
+
   /* ---------- MODAL ---------- */
   .modal-overlay{
     position:fixed; inset:0; background:rgba(13,27,42,.6);
@@ -178,30 +198,47 @@
 </head>
 <body>
 
-<!-- ===================== LOGIN ===================== -->
-<div id="loginScreen" class="login-screen">
+<!-- ===================== CARREGANDO ===================== -->
+<div id="loadingScreen" class="login-screen">
+  <div class="login-box"><p class="hint">Conectando...</p></div>
+</div>
+
+<!-- ===================== LOGIN / CADASTRO ===================== -->
+<div id="loginScreen" class="login-screen hidden">
   <div class="login-box">
     <div class="login-emblem">🕯️ 🌊 🍃</div>
     <h1>Casa de Caridade e Esperança</h1>
     <p class="login-subtitle">Painel de Organização</p>
-    <form id="loginForm">
-      <label>Seu nome
-        <input type="text" id="loginName" required placeholder="Como você é chamado(a) no terreiro">
+
+    <div class="auth-tabs">
+      <button type="button" id="tabLoginBtn" class="auth-tab active" onclick="switchAuthTab('login')">Entrar</button>
+      <button type="button" id="tabRegisterBtn" class="auth-tab" onclick="switchAuthTab('register')">Criar conta</button>
+    </div>
+
+    <form id="loginForm" class="auth-form">
+      <label>E-mail
+        <input type="email" id="loginEmail" required>
       </label>
-      <label class="checkbox-label">
-        <input type="checkbox" id="isAdminCheck"> Sou administrador(a)
+      <label>Senha
+        <input type="password" id="loginPassword" required>
       </label>
-      <div id="adminFields" class="hidden">
-        <label>Usuário administrador
-          <input type="text" id="adminUser">
-        </label>
-        <label>Senha
-          <input type="password" id="adminPass">
-        </label>
-      </div>
       <button type="submit" class="btn-primary">Entrar</button>
-      <p id="loginError" class="error hidden"></p>
     </form>
+
+    <form id="registerForm" class="auth-form hidden">
+      <label>Seu nome
+        <input type="text" id="registerName" required placeholder="Como você é chamado(a) no terreiro">
+      </label>
+      <label>E-mail
+        <input type="email" id="registerEmail" required>
+      </label>
+      <label>Senha (mínimo 6 caracteres)
+        <input type="password" id="registerPassword" required minlength="6">
+      </label>
+      <button type="submit" class="btn-primary">Criar conta</button>
+    </form>
+
+    <p id="authError" class="error hidden"></p>
   </div>
 </div>
 
@@ -234,14 +271,29 @@
 
 <script>
 /* =====================================================
-   CONFIGURAÇÃO — edite aqui os 2 administradores
+   CONFIGURAÇÃO DO FIREBASE
+   Cole aqui as chaves do SEU projeto Firebase
+   (Firebase Console > Configurações do projeto > Seus apps > SDK setup)
    ===================================================== */
-const CONFIG = {
-  admins: [
-    { user: 'Thiago Dossi', pass: 'Terreiro' },
-    { user: 'admin2', pass: 'troque-esta-senha-2' }
-  ]
+const firebaseConfig = {
+  apiKey: "COLE_AQUI_SUA_API_KEY",
+  authDomain: "COLE_AQUI.firebaseapp.com",
+  projectId: "COLE_AQUI",
+  storageBucket: "COLE_AQUI.appspot.com",
+  messagingSenderId: "COLE_AQUI",
+  appId: "COLE_AQUI"
 };
+
+/* Os dois e-mails que terão permissão de administrador (podem excluir).
+   Precisam ser exatamente os e-mails usados para criar a conta no site. */
+const ADMIN_EMAILS = [
+  'admin1@exemplo.com',
+  'admin2@exemplo.com'
+];
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
 
 const STOCK_CATEGORIES = [
   { id:'defumacao',   name:'Defumação',                  icon:'🌿' },
@@ -265,23 +317,23 @@ const ACTIVITY_CATEGORIES = [
 ];
 
 /* =====================================================
-   ESTADO / PERSISTÊNCIA
+   ESTADO EM MEMÓRIA (alimentado pelo Firestore em tempo real)
    ===================================================== */
-function initData(){
-  let data = JSON.parse(localStorage.getItem('terreiroData') || 'null') || { events:[], stock:{}, activities:{} };
-  STOCK_CATEGORIES.forEach(c=>{ if(!data.stock[c.id]) data.stock[c.id] = []; });
-  ACTIVITY_CATEGORIES.forEach(c=>{
-    if(c.sub){ c.sub.forEach(s=>{ if(!data.activities[s.id]) data.activities[s.id] = []; }); }
-    else if(!data.activities[c.id]) data.activities[c.id] = [];
-  });
-  return data;
-}
-let DATA = initData();
-function save(){ localStorage.setItem('terreiroData', JSON.stringify(DATA)); }
+let DATA = { events: [], stock: {}, activities: {}, patients: [] };
+STOCK_CATEGORIES.forEach(c => { DATA.stock[c.id] = []; });
+ACTIVITY_CATEGORIES.forEach(c => {
+  if(c.sub) c.sub.forEach(s => { DATA.activities[s.id] = []; });
+  else DATA.activities[c.id] = [];
+});
 
-let session = JSON.parse(localStorage.getItem('terreiroSession') || 'null');
-function isAdmin(){ return !!session && session.role === 'admin'; }
-function logout(){ localStorage.removeItem('terreiroSession'); location.reload(); }
+let session = null;
+let currentView = { type:'calendar', id:'calendario' };
+let unsubEvents = null, unsubStock = null, unsubTasks = null, unsubPatients = null;
+
+function isAdminEmail(email){
+  return ADMIN_EMAILS.map(e => e.toLowerCase()).includes((email || '').toLowerCase());
+}
+function isAdmin(){ return !!session && isAdminEmail(session.email); }
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function escapeHtml(str){
@@ -296,8 +348,150 @@ function formatDateBR(dateStr){
   const [y,m,d] = dateStr.split('-');
   return `${d}/${m}/${y}`;
 }
+function calcAge(dob){
+  if(!dob) return null;
+  const birth = new Date(dob + 'T00:00:00');
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const hadBirthdayThisYear = (today.getMonth() > birth.getMonth()) ||
+    (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
+  if(!hadBirthdayThisYear) age--;
+  return age;
+}
 
 const content = document.getElementById('content');
+
+/* =====================================================
+   AUTENTICAÇÃO
+   ===================================================== */
+function switchAuthTab(tab){
+  document.getElementById('tabLoginBtn').classList.toggle('active', tab === 'login');
+  document.getElementById('tabRegisterBtn').classList.toggle('active', tab === 'register');
+  document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('registerForm').classList.toggle('hidden', tab !== 'register');
+  hideAuthError();
+}
+function showAuthError(msg){
+  const el = document.getElementById('authError');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+function hideAuthError(){ document.getElementById('authError').classList.add('hidden'); }
+
+function translateAuthError(err){
+  const map = {
+    'auth/email-already-in-use': 'Este e-mail já está cadastrado. Tente a aba "Entrar".',
+    'auth/invalid-email': 'E-mail inválido.',
+    'auth/weak-password': 'A senha precisa ter pelo menos 6 caracteres.',
+    'auth/user-not-found': 'Usuário não encontrado.',
+    'auth/wrong-password': 'Senha incorreta.',
+    'auth/invalid-credential': 'E-mail ou senha incorretos.',
+    'auth/too-many-requests': 'Muitas tentativas seguidas. Aguarde um momento e tente de novo.',
+    'auth/network-request-failed': 'Falha de conexão. Verifique a internet.'
+  };
+  return map[err.code] || ('Não foi possível concluir (' + (err.message || 'erro desconhecido') + ').');
+}
+
+document.getElementById('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  hideAuthError();
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPassword').value;
+  try{
+    await auth.signInWithEmailAndPassword(email, pass);
+  }catch(err){ showAuthError(translateAuthError(err)); }
+});
+
+document.getElementById('registerForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  hideAuthError();
+  const name = document.getElementById('registerName').value.trim();
+  const email = document.getElementById('registerEmail').value.trim();
+  const pass = document.getElementById('registerPassword').value;
+  if(!name){ showAuthError('Informe seu nome.'); return; }
+  try{
+    const cred = await auth.createUserWithEmailAndPassword(email, pass);
+    await cred.user.updateProfile({ displayName: name });
+    await db.collection('users').doc(cred.user.uid).set({
+      name, email,
+      role: isAdminEmail(email) ? 'admin' : 'editor',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }catch(err){ showAuthError(translateAuthError(err)); }
+});
+
+function logout(){
+  if(unsubEvents) unsubEvents();
+  if(unsubStock) unsubStock();
+  if(unsubTasks) unsubTasks();
+  if(unsubPatients) unsubPatients();
+  auth.signOut();
+}
+
+auth.onAuthStateChanged(async user => {
+  document.getElementById('loadingScreen').classList.add('hidden');
+  if(user){
+    let profile;
+    try{
+      const docSnap = await db.collection('users').doc(user.uid).get();
+      profile = docSnap.exists ? docSnap.data() : null;
+    }catch(e){ profile = null; }
+    if(!profile){
+      profile = { name: user.displayName || user.email, email: user.email };
+      db.collection('users').doc(user.uid).set(Object.assign({}, profile, {
+        role: isAdminEmail(user.email) ? 'admin' : 'editor',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      })).catch(()=>{});
+    }
+    session = { uid: user.uid, name: profile.name || user.email, email: user.email };
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    document.getElementById('sessionName').textContent = session.name;
+    document.getElementById('sessionRole').textContent = isAdmin() ? 'Administrador(a)' : 'Colaborador(a)';
+    buildNav();
+    attachRealtimeListeners();
+  } else {
+    session = null;
+    document.getElementById('app').classList.add('hidden');
+    document.getElementById('loginScreen').classList.remove('hidden');
+  }
+});
+
+/* =====================================================
+   LISTENERS EM TEMPO REAL (FIRESTORE)
+   ===================================================== */
+function attachRealtimeListeners(){
+  unsubEvents = db.collection('events').onSnapshot(snap => {
+    DATA.events = snap.docs.map(d => Object.assign({ id:d.id }, d.data()));
+    rerenderIfNeeded(['calendar']);
+  }, err => console.error('events listener:', err));
+
+  unsubStock = db.collection('stockItems').onSnapshot(snap => {
+    const all = snap.docs.map(d => Object.assign({ id:d.id }, d.data()));
+    STOCK_CATEGORIES.forEach(c => { DATA.stock[c.id] = all.filter(it => it.category === c.id); });
+    rerenderIfNeeded(['stock']);
+  }, err => console.error('stock listener:', err));
+
+  unsubTasks = db.collection('activityTasks').onSnapshot(snap => {
+    const all = snap.docs.map(d => Object.assign({ id:d.id }, d.data()));
+    Object.keys(DATA.activities).forEach(catId => { DATA.activities[catId] = all.filter(t => t.category === catId); });
+    rerenderIfNeeded(['activity','calendar']);
+  }, err => console.error('tasks listener:', err));
+
+  unsubPatients = db.collection('curaPatients').onSnapshot(snap => {
+    DATA.patients = snap.docs.map(d => Object.assign({ id:d.id }, d.data()));
+    rerenderIfNeeded(['patients','patientDetail']);
+  }, err => console.error('patients listener:', err));
+}
+
+function rerenderIfNeeded(types){
+  if(!types.includes(currentView.type)) return;
+  if(currentView.type === 'calendar') renderCalendar();
+  else if(currentView.type === 'stock') renderStock(currentView.id);
+  else if(currentView.type === 'activity') renderActivities(currentView.id);
+  else if(currentView.type === 'patients') renderPatients();
+  else if(currentView.type === 'patientDetail') renderPatientDetail(currentView.id);
+}
 
 /* =====================================================
    MODAL GENÉRICO
@@ -340,7 +534,8 @@ function buildNav(){
           ? { id:c.id+'-group', label:c.name, icon:c.icon, children: c.sub.map(s=>({id:s.id,label:s.name,icon:s.icon,type:'activity'})) }
           : { id:c.id, label:c.name, icon:c.icon, type:'activity' }
       )
-    }
+    },
+    { id:'pacientes', label:'Pacientes (Trabalho de Cura)', icon:'🩺', type:'patients' }
   ];
   document.getElementById('sidebar').innerHTML = `<ul class="nav-root">${renderNavItems(structure)}</ul>`;
 }
@@ -367,9 +562,11 @@ function setActiveNav(id){
   document.querySelectorAll('.nav-link').forEach(b => b.classList.toggle('active', b.dataset.id === id));
 }
 function navigateTo(type, id){
+  currentView = { type, id };
   if(type === 'calendar') renderCalendar();
   else if(type === 'stock') renderStock(id);
   else if(type === 'activity') renderActivities(id);
+  else if(type === 'patients') renderPatients();
 }
 
 /* =====================================================
@@ -449,7 +646,7 @@ function renderDayEvents(){
             </span>
           </div>
           <p>${escapeHtml(e.desc)}</p>
-          <small>Criado por ${escapeHtml(e.author)}</small>
+          <small>Criado por ${escapeHtml(e.authorName)}</small>
         </div>`).join('') || '<p class="hint">Nenhum evento neste dia.</p>'}
     </div>
     ${tasks.length ? `
@@ -462,7 +659,7 @@ function renderDayEvents(){
             <div class="card-header"><strong>${cat.icon} ${escapeHtml(t.title)}</strong></div>
             <p class="hint">${escapeHtml(cat.name)}</p>
             <p>${escapeHtml(t.desc)}</p>
-            <p class="volunteers"><strong>Voluntários:</strong> ${t.volunteers.length ? t.volunteers.map(escapeHtml).join(', ') : 'Nenhum ainda'}</p>
+            <p class="volunteers"><strong>Voluntários:</strong> ${t.volunteers && t.volunteers.length ? t.volunteers.map(escapeHtml).join(', ') : 'Nenhum ainda'}</p>
             ${t.needsHelp ? '<span class="badge-help">🙋 Precisa de mais gente!</span>' : ''}
             <div class="task-actions">
               <button onclick="navigateTo('activity','${t.catId}')">Ver atividade</button>
@@ -485,10 +682,18 @@ function addEvent(){
   openModal('Novo evento', [
     { key:'title', label:'Título', value:'' },
     { key:'desc', label:'Descrição', type:'textarea', value:'' }
-  ], vals => {
+  ], async vals => {
     if(!vals.title.trim()) return;
-    DATA.events.push({ id:uid(), date:calState.selectedDate, title:vals.title.trim(), desc:vals.desc.trim(), author:session.name });
-    save(); renderCalendar();
+    try{
+      await db.collection('events').add({
+        date: calState.selectedDate,
+        title: vals.title.trim(),
+        desc: vals.desc.trim(),
+        authorName: session.name,
+        authorUid: session.uid,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }catch(err){ alert('Não foi possível salvar: ' + err.message); }
   });
 }
 function editEvent(id){
@@ -496,16 +701,16 @@ function editEvent(id){
   openModal('Editar evento', [
     { key:'title', label:'Título', value:ev.title },
     { key:'desc', label:'Descrição', type:'textarea', value:ev.desc }
-  ], vals => {
-    ev.title = vals.title.trim(); ev.desc = vals.desc.trim();
-    save(); renderCalendar();
+  ], async vals => {
+    try{
+      await db.collection('events').doc(id).update({ title: vals.title.trim(), desc: vals.desc.trim() });
+    }catch(err){ alert('Não foi possível salvar: ' + err.message); }
   });
 }
 function deleteEvent(id){
   if(!isAdmin()) return;
   if(!confirm('Excluir este evento?')) return;
-  DATA.events = DATA.events.filter(e => e.id !== id);
-  save(); renderCalendar();
+  db.collection('events').doc(id).delete().catch(err => alert('Não foi possível excluir: ' + err.message));
 }
 
 /* =====================================================
@@ -545,24 +750,34 @@ function stockFieldsModal(existing){
   ];
 }
 function addStockItem(catId){
-  openModal('Novo item de estoque', stockFieldsModal(), vals => {
+  openModal('Novo item de estoque', stockFieldsModal(), async vals => {
     if(!vals.nome.trim()) return;
-    DATA.stock[catId].push({ id:uid(), nome:vals.nome.trim(), quantidade:vals.quantidade, unidade:vals.unidade.trim(), obs:vals.obs.trim() });
-    save(); renderStock(catId);
+    try{
+      await db.collection('stockItems').add({
+        category: catId,
+        nome: vals.nome.trim(), quantidade: vals.quantidade, unidade: vals.unidade.trim(), obs: vals.obs.trim(),
+        updatedBy: session.name,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }catch(err){ alert('Não foi possível salvar: ' + err.message); }
   });
 }
 function editStockItem(catId, itemId){
   const it = DATA.stock[catId].find(i => i.id === itemId);
-  openModal('Editar item', stockFieldsModal(it), vals => {
-    it.nome = vals.nome.trim(); it.quantidade = vals.quantidade; it.unidade = vals.unidade.trim(); it.obs = vals.obs.trim();
-    save(); renderStock(catId);
+  openModal('Editar item', stockFieldsModal(it), async vals => {
+    try{
+      await db.collection('stockItems').doc(itemId).update({
+        nome: vals.nome.trim(), quantidade: vals.quantidade, unidade: vals.unidade.trim(), obs: vals.obs.trim(),
+        updatedBy: session.name,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }catch(err){ alert('Não foi possível salvar: ' + err.message); }
   });
 }
 function deleteStockItem(catId, itemId){
   if(!isAdmin()) return;
   if(!confirm('Excluir este item?')) return;
-  DATA.stock[catId] = DATA.stock[catId].filter(i => i.id !== itemId);
-  save(); renderStock(catId);
+  db.collection('stockItems').doc(itemId).delete().catch(err => alert('Não foi possível excluir: ' + err.message));
 }
 
 /* =====================================================
@@ -588,7 +803,8 @@ function renderActivities(catId){
   `;
 }
 function renderTaskCard(catId, t){
-  const isVol = t.volunteers.includes(session.name);
+  const volunteers = t.volunteers || [];
+  const isVol = volunteers.includes(session.name);
   return `
     <div class="card task-card">
       <div class="card-header">
@@ -600,7 +816,7 @@ function renderTaskCard(catId, t){
       </div>
       <p>${escapeHtml(t.desc)}</p>
       ${t.date ? `<span class="badge-date">📅 Agendado para ${formatDateBR(t.date)}</span>` : ''}
-      <p class="volunteers"><strong>Voluntários:</strong> ${t.volunteers.length ? t.volunteers.map(escapeHtml).join(', ') : 'Nenhum ainda'}</p>
+      <p class="volunteers"><strong>Voluntários:</strong> ${volunteers.length ? volunteers.map(escapeHtml).join(', ') : 'Nenhum ainda'}</p>
       ${t.needsHelp ? '<span class="badge-help">🙋 Precisa de mais gente!</span>' : ''}
       <div class="task-actions">
         ${isVol
@@ -621,83 +837,202 @@ function taskFieldsModal(existing){
   ];
 }
 function addTask(catId){
-  openModal('Nova atividade', taskFieldsModal(), vals => {
+  openModal('Nova atividade', taskFieldsModal(), async vals => {
     if(!vals.title.trim()) return;
-    DATA.activities[catId].push({ id:uid(), title:vals.title.trim(), desc:vals.desc.trim(), date:vals.date || '', volunteers:[], needsHelp:false, author:session.name });
-    save(); renderActivities(catId);
+    try{
+      await db.collection('activityTasks').add({
+        category: catId,
+        title: vals.title.trim(), desc: vals.desc.trim(), date: vals.date || '',
+        volunteers: [], needsHelp: false,
+        authorName: session.name, authorUid: session.uid,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }catch(err){ alert('Não foi possível salvar: ' + err.message); }
   });
 }
 function editTask(catId, taskId){
   const t = DATA.activities[catId].find(x => x.id === taskId);
-  openModal('Editar atividade', taskFieldsModal(t), vals => {
-    t.title = vals.title.trim(); t.desc = vals.desc.trim(); t.date = vals.date || '';
-    save(); renderActivities(catId);
+  openModal('Editar atividade', taskFieldsModal(t), async vals => {
+    try{
+      await db.collection('activityTasks').doc(taskId).update({
+        title: vals.title.trim(), desc: vals.desc.trim(), date: vals.date || ''
+      });
+    }catch(err){ alert('Não foi possível salvar: ' + err.message); }
   });
 }
 function deleteTask(catId, taskId){
   if(!isAdmin()) return;
   if(!confirm('Excluir esta atividade?')) return;
-  DATA.activities[catId] = DATA.activities[catId].filter(x => x.id !== taskId);
-  save(); renderActivities(catId);
+  db.collection('activityTasks').doc(taskId).delete().catch(err => alert('Não foi possível excluir: ' + err.message));
 }
 function joinTask(catId, taskId){
-  const t = DATA.activities[catId].find(x => x.id === taskId);
-  if(!t.volunteers.includes(session.name)) t.volunteers.push(session.name);
-  save(); renderActivities(catId);
+  db.collection('activityTasks').doc(taskId).update({
+    volunteers: firebase.firestore.FieldValue.arrayUnion(session.name)
+  }).catch(err => alert('Não foi possível salvar: ' + err.message));
 }
 function leaveTask(catId, taskId){
-  const t = DATA.activities[catId].find(x => x.id === taskId);
-  t.volunteers = t.volunteers.filter(v => v !== session.name);
-  save(); renderActivities(catId);
+  db.collection('activityTasks').doc(taskId).update({
+    volunteers: firebase.firestore.FieldValue.arrayRemove(session.name)
+  }).catch(err => alert('Não foi possível salvar: ' + err.message));
 }
 function requestHelp(catId, taskId){
-  const t = DATA.activities[catId].find(x => x.id === taskId);
-  t.needsHelp = true; save(); renderActivities(catId);
+  db.collection('activityTasks').doc(taskId).update({ needsHelp: true })
+    .catch(err => alert('Não foi possível salvar: ' + err.message));
 }
 function clearHelp(catId, taskId){
-  const t = DATA.activities[catId].find(x => x.id === taskId);
-  t.needsHelp = false; save(); renderActivities(catId);
+  db.collection('activityTasks').doc(taskId).update({ needsHelp: false })
+    .catch(err => alert('Não foi possível salvar: ' + err.message));
 }
 
 /* =====================================================
-   LOGIN / INICIALIZAÇÃO
+   PACIENTES DO TRABALHO DE CURA
    ===================================================== */
-document.getElementById('isAdminCheck').addEventListener('change', e => {
-  document.getElementById('adminFields').classList.toggle('hidden', !e.target.checked);
-});
-document.getElementById('loginForm').addEventListener('submit', e => {
-  e.preventDefault();
-  const name = document.getElementById('loginName').value.trim();
-  const errorEl = document.getElementById('loginError');
-  errorEl.classList.add('hidden');
-  if(!name) return;
-  let role = 'editor';
-  if(document.getElementById('isAdminCheck').checked){
-    const u = document.getElementById('adminUser').value.trim();
-    const p = document.getElementById('adminPass').value;
-    const match = CONFIG.admins.find(a => a.user === u && a.pass === p);
-    if(!match){
-      errorEl.textContent = 'Usuário ou senha de administrador incorretos.';
-      errorEl.classList.remove('hidden');
-      return;
-    }
-    role = 'admin';
-  }
-  session = { name, role };
-  localStorage.setItem('terreiroSession', JSON.stringify(session));
-  startApp();
-});
-
-function startApp(){
-  document.getElementById('loginScreen').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
-  document.getElementById('sessionName').textContent = session.name;
-  document.getElementById('sessionRole').textContent = session.role === 'admin' ? 'Administrador(a)' : 'Colaborador(a)';
-  buildNav();
-  renderCalendar();
+function renderPatients(){
+  setActiveNav('pacientes');
+  const patients = DATA.patients.slice().sort((a,b) => (a.nome||'').localeCompare(b.nome||''));
+  content.innerHTML = `
+    <div class="view-header"><h2>🩺 Pacientes do Trabalho de Cura</h2></div>
+    <p class="hint">Fichas de acompanhamento dos pacientes atendidos no Trabalho de Cura.</p>
+    <div class="card-list">
+      ${patients.length ? patients.map(p => renderPatientCard(p)).join('') : '<p class="hint">Nenhum paciente cadastrado ainda.</p>'}
+    </div>
+    <button class="btn-primary" onclick="addPatient()">+ Nova ficha de paciente</button>
+  `;
 }
+function renderPatientCard(p){
+  const age = calcAge(p.nascimento);
+  return `
+    <div class="card">
+      <div class="card-header">
+        <strong>${escapeHtml(p.nome)}</strong>
+        <span class="card-actions">
+          <button onclick="editPatient('${p.id}')">✏️</button>
+          ${isAdmin() ? `<button onclick="deletePatient('${p.id}')">🗑️</button>` : ''}
+        </span>
+      </div>
+      <div class="patient-summary-grid">
+        ${age !== null ? `<span><span class="patient-field-label">Idade</span><br>${age} anos</span>` : ''}
+        ${p.contato ? `<span><span class="patient-field-label">Contato</span><br>${escapeHtml(p.contato)}</span>` : ''}
+      </div>
+      ${p.motivo ? `<p><span class="patient-field-label">Motivo</span><br>${escapeHtml(p.motivo)}</p>` : ''}
+      <div class="task-actions">
+        <button onclick="navigateToPatientDetail('${p.id}')">📋 Ver ficha completa</button>
+      </div>
+    </div>
+  `;
+}
+function patientFieldsModal(existing){
+  return [
+    { key:'nome', label:'Nome completo', value: existing ? existing.nome : '' },
+    { key:'nascimento', label:'Data de nascimento (opcional)', type:'date', value: existing ? (existing.nascimento || '') : '' },
+    { key:'contato', label:'Contato (telefone/WhatsApp)', value: existing ? (existing.contato || '') : '' },
+    { key:'endereco', label:'Endereço (opcional)', value: existing ? (existing.endereco || '') : '' },
+    { key:'motivo', label:'Motivo / queixa inicial', type:'textarea', value: existing ? (existing.motivo || '') : '' },
+    { key:'orientacoes', label:'Orientações gerais', type:'textarea', value: existing ? (existing.orientacoes || '') : '' }
+  ];
+}
+function addPatient(){
+  openModal('Nova ficha de paciente', patientFieldsModal(), async vals => {
+    if(!vals.nome.trim()) return;
+    try{
+      await db.collection('curaPatients').add({
+        nome: vals.nome.trim(),
+        nascimento: vals.nascimento || '',
+        contato: vals.contato.trim(),
+        endereco: vals.endereco.trim(),
+        motivo: vals.motivo.trim(),
+        orientacoes: vals.orientacoes.trim(),
+        history: [],
+        createdBy: session.name,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }catch(err){ alert('Não foi possível salvar: ' + err.message); }
+  });
+}
+function editPatient(id){
+  const p = DATA.patients.find(x => x.id === id);
+  openModal('Editar ficha de paciente', patientFieldsModal(p), async vals => {
+    try{
+      await db.collection('curaPatients').doc(id).update({
+        nome: vals.nome.trim(),
+        nascimento: vals.nascimento || '',
+        contato: vals.contato.trim(),
+        endereco: vals.endereco.trim(),
+        motivo: vals.motivo.trim(),
+        orientacoes: vals.orientacoes.trim()
+      });
+    }catch(err){ alert('Não foi possível salvar: ' + err.message); }
+  });
+}
+function deletePatient(id){
+  if(!isAdmin()) return;
+  if(!confirm('Excluir esta ficha de paciente? Todo o histórico de atendimentos será perdido.')) return;
+  db.collection('curaPatients').doc(id).delete().catch(err => alert('Não foi possível excluir: ' + err.message));
+}
+function navigateToPatientDetail(id){
+  currentView = { type:'patientDetail', id };
+  renderPatientDetail(id);
+}
+function renderPatientDetail(id){
+  setActiveNav('pacientes');
+  const p = DATA.patients.find(x => x.id === id);
+  if(!p){
+    content.innerHTML = `
+      <button class="back-link" onclick="navigateTo('patients','pacientes')">← Voltar para lista de pacientes</button>
+      <p class="hint">Ficha não encontrada.</p>
+    `;
+    return;
+  }
+  const age = calcAge(p.nascimento);
+  const history = (p.history || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  content.innerHTML = `
+    <button class="back-link" onclick="navigateTo('patients','pacientes')">← Voltar para lista de pacientes</button>
+    <div class="view-header"><h2>🩺 Ficha de ${escapeHtml(p.nome)}</h2></div>
+    <div class="card">
+      <div class="patient-summary-grid">
+        ${age !== null ? `<span><span class="patient-field-label">Idade</span><br>${age} anos</span>` : ''}
+        ${p.nascimento ? `<span><span class="patient-field-label">Nascimento</span><br>${formatDateBR(p.nascimento)}</span>` : ''}
+        ${p.contato ? `<span><span class="patient-field-label">Contato</span><br>${escapeHtml(p.contato)}</span>` : ''}
+        ${p.endereco ? `<span><span class="patient-field-label">Endereço</span><br>${escapeHtml(p.endereco)}</span>` : ''}
+      </div>
+      ${p.motivo ? `<p><span class="patient-field-label">Motivo / queixa inicial</span><br>${escapeHtml(p.motivo)}</p>` : ''}
+      ${p.orientacoes ? `<p><span class="patient-field-label">Orientações gerais</span><br>${escapeHtml(p.orientacoes)}</p>` : ''}
+      <div class="task-actions">
+        <button onclick="editPatient('${p.id}')">✏️ Editar dados</button>
+        ${isAdmin() ? `<button onclick="deletePatient('${p.id}')">🗑️ Excluir ficha</button>` : ''}
+      </div>
+    </div>
 
-if(session){ startApp(); }
+    <h3 style="margin-top:1.5rem">Histórico de atendimentos</h3>
+    <div class="timeline-list">
+      ${history.length ? history.map(h => `
+        <div class="timeline-entry">
+          <div class="timeline-date">${h.date ? formatDateBR(h.date) : ''}</div>
+          <div>${escapeHtml(h.note)}</div>
+          <small class="hint">Registrado por ${escapeHtml(h.author)}</small>
+        </div>
+      `).join('') : '<p class="hint">Nenhum atendimento registrado ainda.</p>'}
+    </div>
+    <button class="btn-primary" style="margin-top:1rem" onclick="addPatientEntry('${p.id}')">+ Registrar atendimento/orientação</button>
+  `;
+}
+function addPatientEntry(patientId){
+  openModal('Registrar atendimento', [
+    { key:'date', label:'Data do atendimento', type:'date', value: todayStr() },
+    { key:'note', label:'Orientações / observações deste atendimento', type:'textarea', value:'' }
+  ], async vals => {
+    if(!vals.note.trim()) return;
+    try{
+      await db.collection('curaPatients').doc(patientId).update({
+        history: firebase.firestore.FieldValue.arrayUnion({
+          date: vals.date || todayStr(),
+          note: vals.note.trim(),
+          author: session.name
+        })
+      });
+    }catch(err){ alert('Não foi possível salvar: ' + err.message); }
+  });
+}
 </script>
 </body>
 </html>
