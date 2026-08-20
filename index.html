@@ -169,6 +169,7 @@
   .table-actions button{ background:none; padding:.1rem .3rem; }
 
   /* ---------- PACIENTES / FICHA DE CURA ---------- */
+  .patient-search{ width:100%; max-width:400px; margin-bottom:1rem; display:block; }
   .patient-summary-grid{
     display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
     gap:.6rem 1.2rem; margin:.6rem 0;
@@ -179,13 +180,19 @@
   .timeline-list{ display:flex; flex-direction:column; gap:.6rem; margin-top:.8rem; }
   .timeline-entry{ background:#f7f1e3; border-left:3px solid var(--dourado); border-radius:6px; padding:.6rem .8rem; font-size:.88rem; }
   .timeline-date{ font-weight:bold; color:var(--mata); font-size:.8rem; margin-bottom:.2rem; }
+  .pf-checkbox-group{ display:flex; flex-direction:column; gap:.5rem; font-weight:normal; }
+  .pf-checkbox-row{ display:flex; align-items:center; gap:.5rem; font-weight:normal; font-size:.9rem; }
+  .pf-checkbox-row input[type="checkbox"]{ width:16px; height:16px; }
+  .pf-outros-input{ margin-top:.3rem; margin-left:1.6rem; width:calc(100% - 1.6rem); }
+  .nao-ingerir-tags{ display:flex; gap:.4rem; flex-wrap:wrap; margin-top:.3rem; }
+  .nao-ingerir-tag{ background:#fdecea; color:#a4161a; border:1px solid #f3b8b0; border-radius:20px; padding:.15rem .7rem; font-size:.8rem; }
 
   /* ---------- MODAL ---------- */
   .modal-overlay{
     position:fixed; inset:0; background:rgba(13,27,42,.6);
     display:flex; align-items:center; justify-content:center; z-index:50;
   }
-  .modal-box{ background:var(--branco); border:2px solid var(--dourado); border-radius:10px; padding:1.5rem; width:90%; max-width:420px; }
+  .modal-box{ background:var(--branco); border:2px solid var(--dourado); border-radius:10px; padding:1.5rem; width:90%; max-width:440px; max-height:88vh; overflow-y:auto; }
   .modal-body{ display:flex; flex-direction:column; gap:.8rem; margin:1rem 0; }
   .modal-body label{ display:flex; flex-direction:column; gap:.3rem; font-size:.85rem; font-weight:bold; text-align:left; }
   .modal-actions{ display:flex; justify-content:flex-end; gap:.6rem; }
@@ -328,6 +335,7 @@ ACTIVITY_CATEGORIES.forEach(c => {
 
 let session = null;
 let currentView = { type:'calendar', id:'calendario' };
+let patientSearchQuery = '';
 let unsubEvents = null, unsubStock = null, unsubTasks = null, unsubPatients = null;
 
 function isAdminEmail(email){
@@ -347,16 +355,6 @@ function todayStr(){
 function formatDateBR(dateStr){
   const [y,m,d] = dateStr.split('-');
   return `${d}/${m}/${y}`;
-}
-function calcAge(dob){
-  if(!dob) return null;
-  const birth = new Date(dob + 'T00:00:00');
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const hadBirthdayThisYear = (today.getMonth() > birth.getMonth()) ||
-    (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate());
-  if(!hadBirthdayThisYear) age--;
-  return age;
 }
 
 const content = document.getElementById('content');
@@ -889,18 +887,30 @@ function clearHelp(catId, taskId){
    ===================================================== */
 function renderPatients(){
   setActiveNav('pacientes');
-  const patients = DATA.patients.slice().sort((a,b) => (a.nome||'').localeCompare(b.nome||''));
+  const query = (patientSearchQuery || '').toLowerCase().trim();
+  const patients = DATA.patients
+    .filter(p => !query || (p.nome||'').toLowerCase().includes(query) || (p.telefone||'').toLowerCase().includes(query))
+    .slice().sort((a,b) => (a.nome||'').localeCompare(b.nome||''));
   content.innerHTML = `
     <div class="view-header"><h2>🩺 Pacientes do Trabalho de Cura</h2></div>
     <p class="hint">Fichas de acompanhamento dos pacientes atendidos no Trabalho de Cura.</p>
+    <input type="text" id="patientSearchInput" class="patient-search" placeholder="🔎 Buscar por nome ou telefone..." value="${escapeHtml(patientSearchQuery || '')}">
     <div class="card-list">
-      ${patients.length ? patients.map(p => renderPatientCard(p)).join('') : '<p class="hint">Nenhum paciente cadastrado ainda.</p>'}
+      ${patients.length ? patients.map(p => renderPatientCard(p)).join('') : '<p class="hint">Nenhum paciente encontrado.</p>'}
     </div>
     <button class="btn-primary" onclick="addPatient()">+ Nova ficha de paciente</button>
   `;
+  const searchInput = document.getElementById('patientSearchInput');
+  searchInput.addEventListener('input', e => {
+    patientSearchQuery = e.target.value;
+    const cursorPos = e.target.selectionStart;
+    renderPatients();
+    const newInput = document.getElementById('patientSearchInput');
+    newInput.focus();
+    newInput.setSelectionRange(cursorPos, cursorPos);
+  });
 }
 function renderPatientCard(p){
-  const age = calcAge(p.nascimento);
   return `
     <div class="card">
       <div class="card-header">
@@ -910,57 +920,90 @@ function renderPatientCard(p){
           ${isAdmin() ? `<button onclick="deletePatient('${p.id}')">🗑️</button>` : ''}
         </span>
       </div>
-      <div class="patient-summary-grid">
-        ${age !== null ? `<span><span class="patient-field-label">Idade</span><br>${age} anos</span>` : ''}
-        ${p.contato ? `<span><span class="patient-field-label">Contato</span><br>${escapeHtml(p.contato)}</span>` : ''}
-      </div>
-      ${p.motivo ? `<p><span class="patient-field-label">Motivo</span><br>${escapeHtml(p.motivo)}</p>` : ''}
+      ${p.telefone ? `<p><span class="patient-field-label">Telefone</span><br>${escapeHtml(p.telefone)}</p>` : ''}
       <div class="task-actions">
         <button onclick="navigateToPatientDetail('${p.id}')">📋 Ver ficha completa</button>
       </div>
     </div>
   `;
 }
-function patientFieldsModal(existing){
-  return [
-    { key:'nome', label:'Nome completo', value: existing ? existing.nome : '' },
-    { key:'nascimento', label:'Data de nascimento (opcional)', type:'date', value: existing ? (existing.nascimento || '') : '' },
-    { key:'contato', label:'Contato (telefone/WhatsApp)', value: existing ? (existing.contato || '') : '' },
-    { key:'endereco', label:'Endereço (opcional)', value: existing ? (existing.endereco || '') : '' },
-    { key:'motivo', label:'Motivo / queixa inicial', type:'textarea', value: existing ? (existing.motivo || '') : '' },
-    { key:'orientacoes', label:'Orientações gerais', type:'textarea', value: existing ? (existing.orientacoes || '') : '' }
-  ];
+function openPatientFormModal(title, existing, onSave){
+  const ni = (existing && existing.naoIngerir) || {};
+  modalTitle.textContent = title;
+  modalBody.innerHTML = `
+    <label>Nome
+      <input type="text" id="pf-nome" value="${escapeHtml(existing ? existing.nome : '')}">
+    </label>
+    <label>Telefone
+      <input type="text" id="pf-telefone" value="${escapeHtml(existing ? (existing.telefone || '') : '')}">
+    </label>
+    <label>Repouso
+      <input type="text" id="pf-repouso" value="${escapeHtml(existing ? (existing.repouso || '') : '')}">
+    </label>
+    <label>Não ingerir
+      <span class="pf-checkbox-group">
+        <span class="pf-checkbox-row"><input type="checkbox" id="pf-acucar" ${ni.acucar ? 'checked' : ''}> Açúcar</span>
+        <span class="pf-checkbox-row"><input type="checkbox" id="pf-farinha" ${ni.farinha ? 'checked' : ''}> Farinha</span>
+        <span class="pf-checkbox-row"><input type="checkbox" id="pf-cafe" ${ni.cafe ? 'checked' : ''}> Café</span>
+        <span>
+          <span class="pf-checkbox-row"><input type="checkbox" id="pf-outros" ${ni.outros ? 'checked' : ''}> Outros</span>
+          <input type="text" id="pf-outrosTexto" class="pf-outros-input" placeholder="especifique" value="${escapeHtml(ni.outrosTexto || '')}">
+        </span>
+      </span>
+    </label>
+    <label>Vidros
+      <input type="text" id="pf-vidros" value="${escapeHtml(existing ? (existing.vidros || '') : '')}">
+    </label>
+    <label>Vezes
+      <input type="text" id="pf-vezes" value="${escapeHtml(existing ? (existing.vezes || '') : '')}">
+    </label>
+    <label>+Cirurgias
+      <textarea id="pf-cirurgias">${escapeHtml(existing ? (existing.cirurgias || '') : '')}</textarea>
+    </label>
+    <label>Observações
+      <textarea id="pf-observacoes">${escapeHtml(existing ? (existing.observacoes || '') : '')}</textarea>
+    </label>
+  `;
+  modalOverlay.classList.remove('hidden');
+  modalSaveBtn.onclick = () => {
+    const nome = document.getElementById('pf-nome').value.trim();
+    if(!nome) return;
+    const vals = {
+      nome,
+      telefone: document.getElementById('pf-telefone').value.trim(),
+      repouso: document.getElementById('pf-repouso').value.trim(),
+      naoIngerir: {
+        acucar: document.getElementById('pf-acucar').checked,
+        farinha: document.getElementById('pf-farinha').checked,
+        cafe: document.getElementById('pf-cafe').checked,
+        outros: document.getElementById('pf-outros').checked,
+        outrosTexto: document.getElementById('pf-outrosTexto').value.trim()
+      },
+      vidros: document.getElementById('pf-vidros').value.trim(),
+      vezes: document.getElementById('pf-vezes').value.trim(),
+      cirurgias: document.getElementById('pf-cirurgias').value.trim(),
+      observacoes: document.getElementById('pf-observacoes').value.trim()
+    };
+    onSave(vals);
+    closeModal();
+  };
 }
 function addPatient(){
-  openModal('Nova ficha de paciente', patientFieldsModal(), async vals => {
-    if(!vals.nome.trim()) return;
+  openPatientFormModal('Nova ficha de paciente', null, async vals => {
     try{
-      await db.collection('curaPatients').add({
-        nome: vals.nome.trim(),
-        nascimento: vals.nascimento || '',
-        contato: vals.contato.trim(),
-        endereco: vals.endereco.trim(),
-        motivo: vals.motivo.trim(),
-        orientacoes: vals.orientacoes.trim(),
+      await db.collection('curaPatients').add(Object.assign({}, vals, {
         history: [],
         createdBy: session.name,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
+      }));
     }catch(err){ alert('Não foi possível salvar: ' + err.message); }
   });
 }
 function editPatient(id){
   const p = DATA.patients.find(x => x.id === id);
-  openModal('Editar ficha de paciente', patientFieldsModal(p), async vals => {
+  openPatientFormModal('Editar ficha de paciente', p, async vals => {
     try{
-      await db.collection('curaPatients').doc(id).update({
-        nome: vals.nome.trim(),
-        nascimento: vals.nascimento || '',
-        contato: vals.contato.trim(),
-        endereco: vals.endereco.trim(),
-        motivo: vals.motivo.trim(),
-        orientacoes: vals.orientacoes.trim()
-      });
+      await db.collection('curaPatients').doc(id).update(vals);
     }catch(err){ alert('Não foi possível salvar: ' + err.message); }
   });
 }
@@ -983,20 +1026,30 @@ function renderPatientDetail(id){
     `;
     return;
   }
-  const age = calcAge(p.nascimento);
+  const ni = p.naoIngerir || {};
+  const naoIngerirTags = [];
+  if(ni.acucar) naoIngerirTags.push('Açúcar');
+  if(ni.farinha) naoIngerirTags.push('Farinha');
+  if(ni.cafe) naoIngerirTags.push('Café');
+  if(ni.outros) naoIngerirTags.push(ni.outrosTexto ? `Outros: ${ni.outrosTexto}` : 'Outros');
+
   const history = (p.history || []).slice().sort((a,b) => (b.date||'').localeCompare(a.date||''));
   content.innerHTML = `
     <button class="back-link" onclick="navigateTo('patients','pacientes')">← Voltar para lista de pacientes</button>
     <div class="view-header"><h2>🩺 Ficha de ${escapeHtml(p.nome)}</h2></div>
     <div class="card">
       <div class="patient-summary-grid">
-        ${age !== null ? `<span><span class="patient-field-label">Idade</span><br>${age} anos</span>` : ''}
-        ${p.nascimento ? `<span><span class="patient-field-label">Nascimento</span><br>${formatDateBR(p.nascimento)}</span>` : ''}
-        ${p.contato ? `<span><span class="patient-field-label">Contato</span><br>${escapeHtml(p.contato)}</span>` : ''}
-        ${p.endereco ? `<span><span class="patient-field-label">Endereço</span><br>${escapeHtml(p.endereco)}</span>` : ''}
+        ${p.telefone ? `<span><span class="patient-field-label">Telefone</span><br>${escapeHtml(p.telefone)}</span>` : ''}
+        ${p.repouso ? `<span><span class="patient-field-label">Repouso</span><br>${escapeHtml(p.repouso)}</span>` : ''}
+        ${p.vidros ? `<span><span class="patient-field-label">Vidros</span><br>${escapeHtml(p.vidros)}</span>` : ''}
+        ${p.vezes ? `<span><span class="patient-field-label">Vezes</span><br>${escapeHtml(p.vezes)}</span>` : ''}
       </div>
-      ${p.motivo ? `<p><span class="patient-field-label">Motivo / queixa inicial</span><br>${escapeHtml(p.motivo)}</p>` : ''}
-      ${p.orientacoes ? `<p><span class="patient-field-label">Orientações gerais</span><br>${escapeHtml(p.orientacoes)}</p>` : ''}
+      ${naoIngerirTags.length ? `
+        <p class="patient-field-label">Não ingerir</p>
+        <div class="nao-ingerir-tags">${naoIngerirTags.map(t => `<span class="nao-ingerir-tag">${escapeHtml(t)}</span>`).join('')}</div>
+      ` : ''}
+      ${p.cirurgias ? `<p><span class="patient-field-label">Cirurgias</span><br>${escapeHtml(p.cirurgias)}</p>` : ''}
+      ${p.observacoes ? `<p><span class="patient-field-label">Observações</span><br>${escapeHtml(p.observacoes)}</p>` : ''}
       <div class="task-actions">
         <button onclick="editPatient('${p.id}')">✏️ Editar dados</button>
         ${isAdmin() ? `<button onclick="deletePatient('${p.id}')">🗑️ Excluir ficha</button>` : ''}
